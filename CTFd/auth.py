@@ -387,6 +387,8 @@ def login():
         db.session.close()
         return render_template("login.html", errors=errors)
 
+# Disable CSRF only for login, will be automated
+login._bypass_csrf = True
 
 @auth.route("/oauth")
 def oauth_login():

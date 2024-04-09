@@ -486,7 +486,9 @@ def oauth_redirect():
             "grant_type": "authorization_code",
             "redirect_url": url_for("auth.oauth_redirect", _external=True),
         }
+        log("logins", "[{date}] {ip} - OAuth code exchange: " + str(data))
         token_request = requests.post(url, data=data, headers=headers)
+        log("logins", "[{date}] {ip} - OAuth code response: " + str(token_request))
 
         if token_request.status_code == requests.codes.ok:
             token = token_request.json()["access_token"]
@@ -535,39 +537,6 @@ def oauth_redirect():
                         message="Public registration is disabled. Please try again later.",
                     )
                     return redirect(url_for("auth.login"))
-
-            if get_config("user_mode") == TEAMS_MODE and user.team_id is None:
-                team_id = api_data["team"]["id"]
-                team_name = api_data["team"]["name"]
-
-                team = Teams.query.filter_by(oauth_id=team_id).first()
-                if team is None:
-                    num_teams_limit = int(get_config("num_teams", default=0))
-                    num_teams = Teams.query.filter_by(
-                        banned=False, hidden=False
-                    ).count()
-                    if num_teams_limit and num_teams >= num_teams_limit:
-                        abort(
-                            403,
-                            description=f"Reached the maximum number of teams ({num_teams_limit}). Please join an existing team.",
-                        )
-
-                    team = Teams(name=team_name, oauth_id=team_id, captain_id=user.id)
-                    db.session.add(team)
-                    db.session.commit()
-                    clear_team_session(team_id=team.id)
-
-                team_size_limit = get_config("team_size", default=0)
-                if team_size_limit and len(team.members) >= team_size_limit:
-                    plural = "" if team_size_limit == 1 else "s"
-                    size_error = "Teams are limited to {limit} member{plural}.".format(
-                        limit=team_size_limit, plural=plural
-                    )
-                    error_for(endpoint="auth.login", message=size_error)
-                    return redirect(url_for("auth.login"))
-
-                team.members.append(user)
-                db.session.commit()
 
             if user.oauth_id is None:
                 user.oauth_id = user_id

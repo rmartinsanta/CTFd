@@ -441,10 +441,7 @@ def oauth_login():
         or getenv("OAUTH_AUTHORIZATION_ENDPOINT", "https://auth.majorleaguecyber.org/oauth/authorize")
     )
 
-    if get_config("user_mode") == "teams":
-        scope = "openid email profile team"
-    else:
-        scope = "openid email profile"
+    scope = "openid email profile"
 
     client_id = get_app_config("OAUTH_CLIENT_ID") or get_config("oauth_client_id") or getenv("OAUTH_CLIENT_ID")
 

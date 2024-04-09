@@ -1,4 +1,6 @@
 import requests
+from os import getenv
+from hashlib import sha1
 from flask import Blueprint, abort
 from flask import current_app as app
 from flask import redirect, render_template, request, session, url_for
@@ -520,15 +522,15 @@ def oauth_login():
     endpoint = (
         get_app_config("OAUTH_AUTHORIZATION_ENDPOINT")
         or get_config("oauth_authorization_endpoint")
-        or "https://auth.majorleaguecyber.org/oauth/authorize"
+        or getenv("OAUTH_AUTHORIZATION_ENDPOINT", "https://auth.majorleaguecyber.org/oauth/authorize")
     )
 
     if get_config("user_mode") == "teams":
-        scope = "profile team"
+        scope = "openid email profile team"
     else:
-        scope = "profile"
+        scope = "openid email profile"
 
-    client_id = get_app_config("OAUTH_CLIENT_ID") or get_config("oauth_client_id")
+    client_id = get_app_config("OAUTH_CLIENT_ID") or get_config("oauth_client_id") or getenv("OAUTH_CLIENT_ID")
 
     if client_id is None:
         error_for(
@@ -538,8 +540,8 @@ def oauth_login():
         )
         return redirect(url_for("auth.login"))
 
-    redirect_url = "{endpoint}?response_type=code&client_id={client_id}&scope={scope}&state={state}".format(
-        endpoint=endpoint, client_id=client_id, scope=scope, state=session["nonce"]
+    redirect_url = "{endpoint}?response_type=code&client_id={client_id}&scope={scope}&state={state}&redirect_uri={redirect_uri}".format(
+        endpoint=endpoint, client_id=client_id, scope=scope, state=session["nonce"], redirect_uri=url_for("auth.oauth_redirect", _external=True)
     )
     return redirect(redirect_url)
 
@@ -558,19 +560,18 @@ def oauth_redirect():
         url = (
             get_app_config("OAUTH_TOKEN_ENDPOINT")
             or get_config("oauth_token_endpoint")
-            or "https://auth.majorleaguecyber.org/oauth/token"
+            or getenv("OAUTH_TOKEN_ENDPOINT", "https://auth.majorleaguecyber.org/oauth/token")
         )
 
-        client_id = get_app_config("OAUTH_CLIENT_ID") or get_config("oauth_client_id")
-        client_secret = get_app_config("OAUTH_CLIENT_SECRET") or get_config(
-            "oauth_client_secret"
-        )
+        client_id = get_app_config("OAUTH_CLIENT_ID") or get_config("oauth_client_id") or getenv("OAUTH_CLIENT_ID")
+        client_secret = get_app_config("OAUTH_CLIENT_SECRET") or get_config("oauth_client_secret") or getenv("OAUTH_CLIENT_SECRET")
         headers = {"content-type": "application/x-www-form-urlencoded"}
         data = {
             "code": oauth_code,
             "client_id": client_id,
             "client_secret": client_secret,
             "grant_type": "authorization_code",
+            "redirect_url": url_for("auth.oauth_redirect", _external=True),
         }
         token_request = requests.post(url, data=data, headers=headers, timeout=5)
 
@@ -579,7 +580,7 @@ def oauth_redirect():
             user_url = (
                 get_app_config("OAUTH_API_ENDPOINT")
                 or get_config("oauth_api_endpoint")
-                or "https://api.majorleaguecyber.org/user"
+                or getenv("OAUTH_API_ENDPOINT", "https://api.majorleaguecyber.org/user")
             )
 
             headers = {
@@ -588,7 +589,8 @@ def oauth_redirect():
             }
             api_data = requests.get(url=user_url, headers=headers, timeout=5).json()
 
-            user_id = api_data["id"]
+            user_subject = api_data["sub"]
+            user_id = int(sha1(user_subject.encode("utf-8")).hexdigest(), 16) % (10 ** 8)
             user_name = api_data["name"]
             user_email = api_data["email"]
 

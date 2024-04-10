@@ -8,8 +8,8 @@ from flask import current_app as app
 from flask import redirect, render_template, request, session, url_for
 from itsdangerous.exc import BadSignature, BadTimeSignature, SignatureExpired
 
-from CTFd.cache import clear_team_session, clear_user_session
-from CTFd.models import Brackets, Teams, UserFieldEntries, UserFields, Users, db
+from CTFd.cache import clear_user_session
+from CTFd.models import Brackets, UserFieldEntries, UserFields, Users, db
 from CTFd.utils import config, email, get_app_config, get_config
 from CTFd.utils import user as current_user
 from CTFd.utils import validators
@@ -21,7 +21,6 @@ from CTFd.utils.decorators import ratelimit
 from CTFd.utils.decorators.visibility import check_registration_visibility
 from CTFd.utils.helpers import error_for, get_errors, markup
 from CTFd.utils.logging import log
-from CTFd.utils.modes import TEAMS_MODE
 from CTFd.utils.security.auth import login_user, logout_user
 from CTFd.utils.security.signing import unserialize
 from CTFd.utils.validators import ValidationError
@@ -486,9 +485,7 @@ def oauth_redirect():
             "grant_type": "authorization_code",
             "redirect_uri": url_for("auth.oauth_redirect", _external=True),
         }
-        log("logins", "[{date}] {ip} - OAuth code exchange: " + str(data))
         token_request = requests.post(url, data=data, headers=headers)
-        log("logins", "[{date}] {ip} - OAuth code response: " + str(token_request))
 
         if token_request.status_code == requests.codes.ok:
             token = token_request.json()["access_token"]

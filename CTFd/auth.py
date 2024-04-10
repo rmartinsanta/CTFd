@@ -8,8 +8,8 @@ from flask import current_app as app
 from flask import redirect, render_template, request, session, url_for
 from itsdangerous.exc import BadSignature, BadTimeSignature, SignatureExpired
 
-from CTFd.cache import clear_team_session, clear_user_session
-from CTFd.models import Brackets, Teams, UserFieldEntries, UserFields, Users, db
+from CTFd.cache import clear_user_session
+from CTFd.models import Brackets, UserFieldEntries, UserFields, Users, db
 from CTFd.utils import config, email, get_app_config, get_config
 from CTFd.utils import user as current_user
 from CTFd.utils import validators
@@ -21,7 +21,6 @@ from CTFd.utils.decorators import ratelimit
 from CTFd.utils.decorators.visibility import check_registration_visibility
 from CTFd.utils.helpers import error_for, get_errors, markup
 from CTFd.utils.logging import log
-from CTFd.utils.modes import TEAMS_MODE
 from CTFd.utils.security.auth import login_user, logout_user
 from CTFd.utils.security.signing import unserialize
 from CTFd.utils.validators import ValidationError
@@ -484,7 +483,7 @@ def oauth_redirect():
             "client_id": client_id,
             "client_secret": client_secret,
             "grant_type": "authorization_code",
-            "redirect_url": url_for("auth.oauth_redirect", _external=True),
+            "redirect_uri": url_for("auth.oauth_redirect", _external=True),
         }
         token_request = requests.post(url, data=data, headers=headers)
 
@@ -535,39 +534,6 @@ def oauth_redirect():
                         message="Public registration is disabled. Please try again later.",
                     )
                     return redirect(url_for("auth.login"))
-
-            if get_config("user_mode") == TEAMS_MODE and user.team_id is None:
-                team_id = api_data["team"]["id"]
-                team_name = api_data["team"]["name"]
-
-                team = Teams.query.filter_by(oauth_id=team_id).first()
-                if team is None:
-                    num_teams_limit = int(get_config("num_teams", default=0))
-                    num_teams = Teams.query.filter_by(
-                        banned=False, hidden=False
-                    ).count()
-                    if num_teams_limit and num_teams >= num_teams_limit:
-                        abort(
-                            403,
-                            description=f"Reached the maximum number of teams ({num_teams_limit}). Please join an existing team.",
-                        )
-
-                    team = Teams(name=team_name, oauth_id=team_id, captain_id=user.id)
-                    db.session.add(team)
-                    db.session.commit()
-                    clear_team_session(team_id=team.id)
-
-                team_size_limit = get_config("team_size", default=0)
-                if team_size_limit and len(team.members) >= team_size_limit:
-                    plural = "" if team_size_limit == 1 else "s"
-                    size_error = "Teams are limited to {limit} member{plural}.".format(
-                        limit=team_size_limit, plural=plural
-                    )
-                    error_for(endpoint="auth.login", message=size_error)
-                    return redirect(url_for("auth.login"))
-
-                team.members.append(user)
-                db.session.commit()
 
             if user.oauth_id is None:
                 user.oauth_id = user_id

@@ -568,7 +568,7 @@ def oauth_redirect():
             "client_id": client_id,
             "client_secret": client_secret,
             "grant_type": "authorization_code",
-            "redirect_url": url_for("auth.oauth_redirect", _external=True),
+            "redirect_uri": url_for("auth.oauth_redirect", _external=True),
         }
         token_request = requests.post(url, data=data, headers=headers, timeout=5)
 

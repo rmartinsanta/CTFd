@@ -620,7 +620,7 @@ def oauth_redirect():
                     )
                     return redirect(url_for("auth.login"))
 
-            if get_config("user_mode") == TEAMS_MODE and user.team_id is None:
+            if get_config("user_mode") == TEAMS_MODE and user.team_id is None and "team" in api_data and "id" in api_data["team"]:
                 team_id = api_data["team"]["id"]
                 team_name = api_data["team"]["name"]
 
